@@ -17,5 +17,5 @@ The dataset used for this work is mainly from [DuReader Dataset](http://ai.baidu
 
 ## TODO
 - [x] Simplize the code in model.py, layer.py, utils.py, main.py 
-- [] Add prepare.py for training and testing DuReader Dataset
-- [] Train and test the model
+- [ ] Add prepare.py for training and testing DuReader Dataset
+- [ ] Train and test the model
