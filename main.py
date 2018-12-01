@@ -135,3 +135,4 @@ def test(config):
             with open(config.answer_file, "w") as fh:
                 json.dump(remapped_dict, fh)
             print("Exact Match: {}, F1: {}".format(metrics['exact_match'], metrics['f1']))
+            
