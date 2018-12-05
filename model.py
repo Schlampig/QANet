@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 
 import tensorflow as tf
-from .layer import regularizer, conv, highway, residual_block, mask_logits, optimized_trilinear_for_attention, total_params
+from layer import regularizer, conv, highway, residual_block, mask_logits, optimized_trilinear_for_attention, total_params
 
 
 class Model(object):
-    def __init__(self, config, batch, word_mat=None, char_mat=None, trainable=True, opt=True, demo=False, graph=None):
+    def __init__(self, config, batch, word_mat=None, char_mat=None, trainable=True, opt=False, demo=False, graph=None):
         self.config = config
         self.demo = demo
         self.graph = graph if graph is not None else tf.Graph()
@@ -15,22 +15,30 @@ class Model(object):
             if self.demo:
                 self.c = tf.placeholder(tf.int32, [None, config.test_para_limit],"context")
                 self.q = tf.placeholder(tf.int32, [None, config.test_ques_limit],"question")
-                self.ch = tf.placeholder(tf.int32, [None, config.test_para_limit, config.char_limit],"context_char")
-                self.qh = tf.placeholder(tf.int32, [None, config.test_ques_limit, config.char_limit],"question_char")
+                if config.use_char_emb:
+                    self.ch = tf.placeholder(tf.int32, [None, config.test_para_limit, config.char_limit],"context_char")
+                    self.qh = tf.placeholder(tf.int32, [None, config.test_ques_limit, config.char_limit],"question_char")
+                else:
+                    self.ch = tf.placeholder(tf.int32, [None, config.test_para_limit],"context_char")
+                    self.qh = tf.placeholder(tf.int32, [None, config.test_ques_limit],"question_char")
                 self.y1 = tf.placeholder(tf.int32, [None, config.test_para_limit],"answer_index1")
                 self.y2 = tf.placeholder(tf.int32, [None, config.test_para_limit],"answer_index2")
             else:
                 self.c, self.q, self.ch, self.qh, self.y1, self.y2, self.qa_id = batch.get_next()
 
-            # self.word_unk = tf.get_variable("word_unk", shape = [config.glove_dim], initializer=initializer())
-            self.word_mat = tf.get_variable("word_mat", initializer=tf.constant(word_mat, dtype=tf.float32), trainable=False)
-            self.char_mat = tf.get_variable("char_mat", initializer=tf.constant(char_mat, dtype=tf.float32))
-
             self.c_mask = tf.cast(self.c, tf.bool)
             self.q_mask = tf.cast(self.q, tf.bool)
             self.c_len = tf.reduce_sum(tf.cast(self.c_mask, tf.int32), axis=1)
-            self.q_len = tf.reduce_sum(tf.cast(self.q_mask, tf.int32), axis=1)
-
+            self.q_len = tf.reduce_sum(tf.cast(self.q_mask, tf.int32), axis=1)           
+            if config.use_char_emb:
+                self.ch_len = tf.reshape(tf.reduce_sum(tf.cast(tf.cast(self.ch, tf.bool), tf.int32), axis=2), [-1])
+                self.qh_len = tf.reshape(tf.reduce_sum(tf.cast(tf.cast(self.qh, tf.bool), tf.int32), axis=2), [-1])
+            else:
+                self.ch_mask = tf.cast(self.ch, tf.bool)
+                self.qh_mask = tf.cast(self.qh, tf.bool)
+                self.ch_len = tf.reduce_sum(tf.cast(self.c_mask, tf.int32), axis=1)
+                self.qh_len = tf.reduce_sum(tf.cast(self.q_mask, tf.int32), axis=1)
+                
             if opt:
                 N, CL = config.batch_size if not self.demo else 1, config.char_limit
                 self.c_maxlen = tf.reduce_max(self.c_len)
@@ -45,18 +53,16 @@ class Model(object):
                 self.y2 = tf.slice(self.y2, [0, 0], [N, self.c_maxlen])
             else:
                 self.c_maxlen, self.q_maxlen = config.para_limit, config.ques_limit
-
-            self.ch_len = tf.reshape(tf.reduce_sum(
-                tf.cast(tf.cast(self.ch, tf.bool), tf.int32), axis=2), [-1])
-            self.qh_len = tf.reshape(tf.reduce_sum(
-                tf.cast(tf.cast(self.qh, tf.bool), tf.int32), axis=2), [-1])
-
+                
+            self.word_mat = tf.get_variable("word_mat", initializer=tf.constant(word_mat, dtype=tf.float32), trainable=False)
+            self.char_mat = tf.get_variable("char_mat", initializer=tf.constant(char_mat, dtype=tf.float32), trainable=config.use_char_emb)
+            
             self.forward()
             total_params()
 
             if trainable:
                 self.lr = tf.minimum(config.learning_rate, 0.001 / tf.log(999.) * tf.log(tf.cast(self.global_step, tf.float32) + 1))
-                self.opt = tf.train.AdamOptimizer(learning_rate = self.lr, beta1 = 0.8, beta2 = 0.999, epsilon = 1e-7)
+                self.opt = tf.train.AdamOptimizer(learning_rate=self.lr, beta1 = 0.8, beta2 = 0.999, epsilon = 1e-7)
                 grads = self.opt.compute_gradients(self.loss)
                 gradients, variables = zip(*grads)
                 capped_grads, _ = tf.clip_by_global_norm(gradients, config.grad_clip)
@@ -69,20 +75,29 @@ class Model(object):
         N, PL, QL, CL, d, dc, nh = config.batch_size if not self.demo else 1, self.c_maxlen, self.q_maxlen, config.char_limit, config.hidden, config.char_dim, config.num_heads
 
         with tf.variable_scope("Input_Embedding_Layer"):
-            # 获取char embedding词典矩阵
-            ch_emb = tf.reshape(tf.nn.embedding_lookup(self.char_mat, self.ch), [N * PL, CL, dc])
-            qh_emb = tf.reshape(tf.nn.embedding_lookup(self.char_mat, self.qh), [N * QL, CL, dc])
-            ch_emb = tf.nn.dropout(ch_emb, 1.0 - 0.5 * self.dropout)
-            qh_emb = tf.nn.dropout(qh_emb, 1.0 - 0.5 * self.dropout)
-            # char embedding后要过卷积层，而word embedding不用
-            ch_emb = conv(ch_emb, d, bias=True, activation=tf.nn.relu, kernel_size=5, name="char_conv", reuse=None)
-            qh_emb = conv(qh_emb, d, bias=True, activation=tf.nn.relu, kernel_size=5, name="char_conv", reuse=True)
-            ch_emb = tf.reduce_max(ch_emb, axis=1)
-            qh_emb = tf.reduce_max(qh_emb, axis=1)
-            ch_emb = tf.reshape(ch_emb, [N, PL, ch_emb.shape[-1]])
-            qh_emb = tf.reshape(qh_emb, [N, QL, ch_emb.shape[-1]])
+            # 获取char embedding词典矩阵(选择使用char emb或word emb)        
+            if config.use_char_emb:
+                print('Use char_emb...')
+                ch_emb = tf.reshape(tf.nn.embedding_lookup(self.char_mat, self.ch), [N * PL, CL, dc])
+                qh_emb = tf.reshape(tf.nn.embedding_lookup(self.char_mat, self.qh), [N * QL, CL, dc])
+                ch_emb = tf.nn.dropout(ch_emb, 1.0 - 0.5 * self.dropout)
+                qh_emb = tf.nn.dropout(qh_emb, 1.0 - 0.5 * self.dropout)
+                # char embedding后要过卷积层，而word embedding不用
+                ch_emb = conv(ch_emb, d, bias=True, activation=tf.nn.relu, kernel_size=5, name="char_conv", reuse=None)
+                qh_emb = conv(qh_emb, d, bias=True, activation=tf.nn.relu, kernel_size=5, name="char_conv", reuse=True)
+                ch_emb = tf.reduce_max(ch_emb, axis=1)
+                qh_emb = tf.reduce_max(qh_emb, axis=1)
+                ch_emb = tf.reshape(ch_emb, [N, PL, ch_emb.shape[-1]])
+                qh_emb = tf.reshape(qh_emb, [N, QL, ch_emb.shape[-1]])
+            else:
+                print('Use word_emb...')
+                ch_emb = tf.nn.dropout(tf.nn.embedding_lookup(self.char_mat, self.ch), 1.0 - self.dropout)
+                qh_emb = tf.nn.dropout(tf.nn.embedding_lookup(self.char_mat, self.qh), 1.0 - self.dropout)
+
+            # 获取word embedding词典矩阵
             c_emb = tf.nn.dropout(tf.nn.embedding_lookup(self.word_mat, self.c), 1.0 - self.dropout)
             q_emb = tf.nn.dropout(tf.nn.embedding_lookup(self.word_mat, self.q), 1.0 - self.dropout)
+            
             # 合并char embedding与word embedding
             c_emb = tf.concat([c_emb, ch_emb], axis=2)
             q_emb = tf.concat([q_emb, qh_emb], axis=2)
@@ -154,7 +169,7 @@ class Model(object):
 
             outer = tf.matmul(tf.expand_dims(tf.nn.softmax(logits1), axis=2),
                               tf.expand_dims(tf.nn.softmax(logits2), axis=1))
-            outer = tf.matrix_band_part(outer, 0, config.ans_limit)
+            outer = tf.matrix_band_part(outer, 0, -1)
             self.yp1 = tf.argmax(tf.reduce_max(outer, axis=2), axis=1)
             self.yp2 = tf.argmax(tf.reduce_max(outer, axis=1), axis=1)
 
@@ -163,8 +178,8 @@ class Model(object):
             self.loss = tf.reduce_mean(losses + losses2)
 
         if config.l2_norm is not None:
-            variables = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
-            l2_loss = tf.contrib.layers.apply_regularization(regularizer, variables)
+            variables = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)  # 把之前存在tf.GraphKeys.REGULARIZATION_LOSSES里的所有regularizer取出，作为一个list
+            l2_loss = tf.contrib.layers.apply_regularization(regularizer, variables)  # 对参数列表执行正则化方法
             self.loss += l2_loss
 
         if config.decay is not None:
