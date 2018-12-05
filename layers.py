@@ -315,10 +315,10 @@ def batch_dot(x, y, axes=None):
     return out
 
 
-def optimized_trilinear_for_attention(args, c_maxlen, q_maxlen, input_keep_prob=1.0,
-    scope='efficient_trilinear',
-    bias_initializer=tf.zeros_initializer(),
-    kernel_initializer=initializer()):
+def optimized_trilinear_for_attention(args, c_maxlen, q_maxlen, input_keep_prob=1.0, 
+                                      scope='efficient_trilinear', 
+                                      bias_initializer=tf.zeros_initializer(),
+                                      kernel_initializer=initializer()):
     assert len(args) == 2, "just use for computing attention with two input"
     arg0_shape = args[0].get_shape().as_list()
     arg1_shape = args[1].get_shape().as_list()
@@ -330,31 +330,17 @@ def optimized_trilinear_for_attention(args, c_maxlen, q_maxlen, input_keep_prob=
     dtype = args[0].dtype
     droped_args = [tf.nn.dropout(arg, input_keep_prob) for arg in args]
     with tf.variable_scope(scope):
-        weights4arg0 = tf.get_variable(
-            "linear_kernel4arg0", [arg_size, 1],
-            dtype=dtype,
-            regularizer=regularizer,
-            initializer=kernel_initializer)
-        weights4arg1 = tf.get_variable(
-            "linear_kernel4arg1", [arg_size, 1],
-            dtype=dtype,
-            regularizer=regularizer,
-            initializer=kernel_initializer)
-        weights4mlu = tf.get_variable(
-            "linear_kernel4mul", [1, 1, arg_size],
-            dtype=dtype,
-            regularizer=regularizer,
-            initializer=kernel_initializer)
-        biases = tf.get_variable(
-            "linear_bias", [1],
-            dtype=dtype,
-            regularizer=regularizer,
-            initializer=bias_initializer)
+        weights4arg0 = tf.get_variable("linear_kernel4arg0", [arg_size, 1], dtype=dtype, regularizer=regularizer, initializer=kernel_initializer)
+        weights4arg1 = tf.get_variable("linear_kernel4arg1", [arg_size, 1], dtype=dtype, regularizer=regularizer, initializer=kernel_initializer)
+        weights4mlu = tf.get_variable("linear_kernel4mul", [1, 1, arg_size], dtype=dtype, regularizer=regularizer, initializer=kernel_initializer)
+        
         subres0 = tf.tile(dot(droped_args[0], weights4arg0), [1, 1, q_maxlen])
         subres1 = tf.tile(tf.transpose(dot(droped_args[1], weights4arg1), perm=(0, 2, 1)), [1, c_maxlen, 1])
         subres2 = batch_dot(droped_args[0] * weights4mlu, tf.transpose(droped_args[1], perm=(0, 2, 1)))
         res = subres0 + subres1 + subres2
-        nn_ops.bias_add(res, biases)
+        # 加bias似乎无用
+        # biases = tf.get_variable("linear_bias", [1], dtype=dtype, regularizer=regularizer, initializer=bias_initializer)
+        # nn_ops.bias_add(res, biases)
         return res
 
 
@@ -367,4 +353,3 @@ def total_params():
             variable_parametes *= dim.value
         total_parameters += variable_parametes
     print("Total number of trainable parameters: {}".format(total_parameters))
-    
