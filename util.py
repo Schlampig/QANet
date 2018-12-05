@@ -8,6 +8,8 @@ from collections import Counter
 import tensorflow as tf
 
 
+# Load dataset and create batches
+###################################################################################################################
 def get_record_parser(config, is_test=False):
     # 解读config配置信息
     def parse(example):
@@ -24,8 +26,12 @@ def get_record_parser(config, is_test=False):
                                                      "id": tf.FixedLenFeature([], tf.int64)})
         context_idxs = tf.reshape(tf.decode_raw(features["context_idxs"], tf.int32), [para_limit])
         ques_idxs = tf.reshape(tf.decode_raw(features["ques_idxs"], tf.int32), [ques_limit])
-        context_char_idxs = tf.reshape(tf.decode_raw(features["context_char_idxs"], tf.int32), [para_limit, char_limit])
-        ques_char_idxs = tf.reshape(tf.decode_raw(features["ques_char_idxs"], tf.int32), [ques_limit, char_limit])
+        if config.use_char_emb:
+            context_char_idxs = tf.reshape(tf.decode_raw(features["context_char_idxs"], tf.int32), [para_limit, char_limit])
+            ques_char_idxs = tf.reshape(tf.decode_raw(features["ques_char_idxs"], tf.int32), [ques_limit, char_limit])
+        else:
+            context_char_idxs = tf.reshape(tf.decode_raw(features["context_char_idxs"], tf.int32), [para_limit])
+            ques_char_idxs = tf.reshape(tf.decode_raw(features["ques_char_idxs"], tf.int32), [ques_limit])
         y1 = tf.reshape(tf.decode_raw(features["y1"], tf.float32), [para_limit])
         y2 = tf.reshape(tf.decode_raw(features["y2"], tf.float32), [para_limit])
         qa_id = features["id"]
@@ -42,8 +48,8 @@ def get_dataset(record_file, parser, config):
 
 def get_batch_dataset(record_file, parser, config):
     num_threads = tf.constant(config.num_threads, dtype=tf.int32)
-    dataset = tf.data.TFRecordDataset(record_file)
-    dataset = dataset.map(parser, num_parallel_calls=num_threads).shuffle(config.capacity).repeat()
+    dataset = tf.data.TFRecordDataset(record_file)  # 读取数据
+    dataset = dataset.map(parser, num_parallel_calls=num_threads).shuffle(config.capacity).repeat()  # 在数据上运用配置（parser=config）并打乱排序
     if config.is_bucket:
         buckets = [tf.constant(num) for num in range(*config.bucket_range)]
 
@@ -63,8 +69,10 @@ def get_batch_dataset(record_file, parser, config):
     return dataset
 
 
+# Evaluate results
+###################################################################################################################
 def convert_tokens(eval_file, qa_id, pp1, pp2):
-    # 把模型的输出结果（问题对应的文章id、答案起点、答案终点）转为答案字符串存入字典中输出（便于统计正确率）
+    # 把模型的输出结果（在评估数据中通过id找到文章、答案起点、答案终点）转为答案字符串存入字典中输出（便于统计正确率）
     # answer_dict = {qa_id: answer(str), qa_id: answer(str), ...}
     # remapped_dict = {uuid: answer(str), uuid: answer(str), ...}
     answer_dict = {}
@@ -81,21 +89,8 @@ def convert_tokens(eval_file, qa_id, pp1, pp2):
 
 
 def normalize_answer(s):
-    # 清洗答案文本（英文版）
-    def remove_articles(text):
-        return re.sub(r'\b(a|an|the)\b', ' ', text)
-
-    def white_space_fix(text):
-        return ' '.join(text.split())
-
-    def remove_punc(text):
-        exclude = set(string.punctuation)
-        return ''.join(ch for ch in text if ch not in exclude)
-
-    def lower(text):
-        return text.lower()
-
-    return white_space_fix(remove_articles(remove_punc(lower(s))))
+    pass  # 清晰文本s，optional
+    return s
 
 
 def f1_score(prediction, ground_truth):
@@ -140,14 +135,14 @@ def evaluate_batch(model, num_batches, eval_file, sess, data_type, handle, str_h
     answer_dict = {}
     losses = []
     for _ in tqdm(range(1, num_batches + 1)):
-        qa_id, loss, yp1, yp2, = sess.run([model.qa_id, model.loss, model.yp1, model.yp2],
-                                          feed_dict={handle: str_handle})
+        qa_id, loss, yp1, yp2, = sess.run([model.qa_id, model.loss, model.yp1, model.yp2], feed_dict={handle: str_handle})
         answer_dict_, _ = convert_tokens(eval_file, qa_id.tolist(), yp1.tolist(), yp2.tolist())
         answer_dict.update(answer_dict_)
         losses.append(loss)
     loss = np.mean(losses)
     metrics = evaluate(eval_file, answer_dict)
     metrics["loss"] = loss
+    # 添加当前评估结果
     loss_sum = tf.Summary(value=[tf.Summary.Value(tag="{}/loss".format(data_type), simple_value=metrics["loss"]), ])
     f1_sum = tf.Summary(value=[tf.Summary.Value(tag="{}/f1".format(data_type), simple_value=metrics["f1"]), ])
     em_sum = tf.Summary(value=[tf.Summary.Value(tag="{}/em".format(data_type), simple_value=metrics["exact_match"]), ])
