@@ -5,7 +5,7 @@ from layer import regularizer, conv, highway, residual_block, mask_logits, optim
 
 
 class Model(object):
-    def __init__(self, config, batch, word_mat=None, char_mat=None, trainable=True, opt=False, demo=False, graph=None):
+    def __init__(self, config, batch, word_mat=None, char_mat=None, trainable=True, demo=False, graph=None):
         self.config = config
         self.demo = demo
         self.graph = graph if graph is not None else tf.Graph()
@@ -15,31 +15,26 @@ class Model(object):
             if self.demo:
                 self.c = tf.placeholder(tf.int32, [None, config.test_para_limit],"context")
                 self.q = tf.placeholder(tf.int32, [None, config.test_ques_limit],"question")
-                if config.use_char_emb:
+                if config.use_char_emb:  # 处理字的embedding，[[char, char, ...], [char, char, ...], ...]
                     self.ch = tf.placeholder(tf.int32, [None, config.test_para_limit, config.char_limit],"context_char")
                     self.qh = tf.placeholder(tf.int32, [None, config.test_ques_limit, config.char_limit],"question_char")
-                else:
-                    self.ch = tf.placeholder(tf.int32, [None, config.test_para_limit],"context_char")
-                    self.qh = tf.placeholder(tf.int32, [None, config.test_ques_limit],"question_char")
                 self.y1 = tf.placeholder(tf.int32, [None, config.test_para_limit],"answer_index1")
                 self.y2 = tf.placeholder(tf.int32, [None, config.test_para_limit],"answer_index2")
             else:
-                self.c, self.q, self.ch, self.qh, self.y1, self.y2, self.qa_id = batch.get_next()
-
+                if config.use_char_emb:  # 处理字的embedding
+                    self.c, self.q, self.ch, self.qh, self.y1, self.y2, self.qa_id = batch.get_next()
+                else:
+                    self.c, self.q, self.y1, self.y2, self.qa_id = batch.get_next()
+                    
             self.c_mask = tf.cast(self.c, tf.bool)
             self.q_mask = tf.cast(self.q, tf.bool)
             self.c_len = tf.reduce_sum(tf.cast(self.c_mask, tf.int32), axis=1)
             self.q_len = tf.reduce_sum(tf.cast(self.q_mask, tf.int32), axis=1)           
-            if config.use_char_emb:
+            if config.use_char_emb:  # 统计字长
                 self.ch_len = tf.reshape(tf.reduce_sum(tf.cast(tf.cast(self.ch, tf.bool), tf.int32), axis=2), [-1])
                 self.qh_len = tf.reshape(tf.reduce_sum(tf.cast(tf.cast(self.qh, tf.bool), tf.int32), axis=2), [-1])
-            else:
-                self.ch_mask = tf.cast(self.ch, tf.bool)
-                self.qh_mask = tf.cast(self.qh, tf.bool)
-                self.ch_len = tf.reduce_sum(tf.cast(self.c_mask, tf.int32), axis=1)
-                self.qh_len = tf.reduce_sum(tf.cast(self.q_mask, tf.int32), axis=1)
-                
-            if opt:
+            
+            if config.without_limit:
                 N, CL = config.batch_size if not self.demo else 1, config.char_limit
                 self.c_maxlen = tf.reduce_max(self.c_len)
                 self.q_maxlen = tf.reduce_max(self.q_len)
@@ -47,15 +42,18 @@ class Model(object):
                 self.q = tf.slice(self.q, [0, 0], [N, self.q_maxlen])
                 self.c_mask = tf.slice(self.c_mask, [0, 0], [N, self.c_maxlen])
                 self.q_mask = tf.slice(self.q_mask, [0, 0], [N, self.q_maxlen])
-                self.ch = tf.slice(self.ch, [0, 0, 0], [N, self.c_maxlen, CL])
-                self.qh = tf.slice(self.qh, [0, 0, 0], [N, self.q_maxlen, CL])
+                if config.use_char_emb:
+                    self.ch = tf.slice(self.ch, [0, 0, 0], [N, self.c_maxlen, CL])
+                    self.qh = tf.slice(self.qh, [0, 0, 0], [N, self.q_maxlen, CL])
                 self.y1 = tf.slice(self.y1, [0, 0], [N, self.c_maxlen])
                 self.y2 = tf.slice(self.y2, [0, 0], [N, self.c_maxlen])
             else:
                 self.c_maxlen, self.q_maxlen = config.para_limit, config.ques_limit
-                
+            
+            # 载入embedding矩阵，每一行是词/字典里对应的词/字的向量
             self.word_mat = tf.get_variable("word_mat", initializer=tf.constant(word_mat, dtype=tf.float32), trainable=False)
-            self.char_mat = tf.get_variable("char_mat", initializer=tf.constant(char_mat, dtype=tf.float32), trainable=config.use_char_emb)
+            if config.use_char_emb:
+                self.char_mat = tf.get_variable("char_mat", initializer=tf.constant(char_mat, dtype=tf.float32), trainable=True)
             
             self.forward()
             total_params()
@@ -76,7 +74,7 @@ class Model(object):
 
         with tf.variable_scope("Input_Embedding_Layer"):
             # 获取char embedding词典矩阵(选择使用char emb或word emb)        
-            if config.use_char_emb:
+            if config.use_char_emb:  # 查询字典得到字向量
                 print('Use char_emb...')
                 ch_emb = tf.reshape(tf.nn.embedding_lookup(self.char_mat, self.ch), [N * PL, CL, dc])
                 qh_emb = tf.reshape(tf.nn.embedding_lookup(self.char_mat, self.qh), [N * QL, CL, dc])
@@ -89,18 +87,16 @@ class Model(object):
                 qh_emb = tf.reduce_max(qh_emb, axis=1)
                 ch_emb = tf.reshape(ch_emb, [N, PL, ch_emb.shape[-1]])
                 qh_emb = tf.reshape(qh_emb, [N, QL, ch_emb.shape[-1]])
-            else:
-                print('Use word_emb...')
-                ch_emb = tf.nn.dropout(tf.nn.embedding_lookup(self.char_mat, self.ch), 1.0 - self.dropout)
-                qh_emb = tf.nn.dropout(tf.nn.embedding_lookup(self.char_mat, self.qh), 1.0 - self.dropout)
 
             # 获取word embedding词典矩阵
-            c_emb = tf.nn.dropout(tf.nn.embedding_lookup(self.word_mat, self.c), 1.0 - self.dropout)
+            c_emb = tf.nn.dropout(tf.nn.embedding_lookup(self.word_mat, self.c), 1.0 - self.dropout)  # N, c_limit, 200
             q_emb = tf.nn.dropout(tf.nn.embedding_lookup(self.word_mat, self.q), 1.0 - self.dropout)
             
-            # 合并char embedding与word embedding
-            c_emb = tf.concat([c_emb, ch_emb], axis=2)
-            q_emb = tf.concat([q_emb, qh_emb], axis=2)
+            # 分别合并context与question的char embedding与word embedding
+            if config.use_char_emb:
+                c_emb = tf.concat([c_emb, ch_emb], axis=2)
+                q_emb = tf.concat([q_emb, qh_emb], axis=2)
+
             # 合并后的representation过high-way层
             c_emb = highway(c_emb, size=d, scope="highway", dropout=self.dropout, reuse=None)
             q_emb = highway(q_emb, size=d, scope="highway", dropout=self.dropout, reuse=True)
@@ -131,7 +127,8 @@ class Model(object):
                                dropout=self.dropout)
 
         with tf.variable_scope("Context_to_Query_Attention_Layer"):
-            S = optimized_trilinear_for_attention([c, q], self.c_maxlen, self.q_maxlen, input_keep_prob=1.0-self.dropout)
+            # config.without_limit为True则输入的context与question可以是变长，否则是maxlen
+            S = optimized_trilinear_for_attention([c, q], self.c_maxlen, self.q_maxlen, input_keep_prob=1.0-self.dropout, opt=config.without_limit)
             mask_q = tf.expand_dims(self.q_mask, 1)
             S_ = tf.nn.softmax(mask_logits(S, mask=mask_q))
             mask_c = tf.expand_dims(self.c_mask, 2)
@@ -141,7 +138,7 @@ class Model(object):
             attention_outputs = [c, self.c2q, c * self.c2q, c * self.q2c]  # input of the Model Encoder Layer
 
         with tf.variable_scope("Model_Encoder_Layer"):
-            inputs = tf.concat(attention_outputs, axis=-1)
+            inputs = tf.concat(attention_outputs, axis=-1)  # 拼接c, c2q, c * c2q, c * q2c
             self.enc = [conv(inputs, d, name="input_projection")]
             for i in range(3):
                 if i % 2 == 0:  # dropout every 2 blocks
