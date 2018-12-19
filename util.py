@@ -6,6 +6,7 @@ import numpy as np
 from tqdm import tqdm
 from collections import Counter
 import tensorflow as tf
+import jieba
 
 
 # Load dataset and create batches
@@ -16,26 +17,34 @@ def get_record_parser(config, is_test=False):
         para_limit = config.test_para_limit if is_test else config.para_limit
         ques_limit = config.test_ques_limit if is_test else config.ques_limit
         char_limit = config.char_limit
-        features = tf.parse_single_example(example,
-                                           features={"context_idxs": tf.FixedLenFeature([], tf.string),
-                                                     "ques_idxs": tf.FixedLenFeature([], tf.string),
-                                                     "context_char_idxs": tf.FixedLenFeature([], tf.string),
-                                                     "ques_char_idxs": tf.FixedLenFeature([], tf.string),
-                                                     "y1": tf.FixedLenFeature([], tf.string),
-                                                     "y2": tf.FixedLenFeature([], tf.string),
-                                                     "id": tf.FixedLenFeature([], tf.int64)})
-        context_idxs = tf.reshape(tf.decode_raw(features["context_idxs"], tf.int32), [para_limit])
-        ques_idxs = tf.reshape(tf.decode_raw(features["ques_idxs"], tf.int32), [ques_limit])
-        if config.use_char_emb:
+        
+        if config.use_char_emb:  # 处理字的embedding，[[char, char, ...], [char, char, ...], ...]
+            features = tf.parse_single_example(example, 
+                                               features={"context_idxs": tf.FixedLenFeature([], tf.string),
+                                                         "ques_idxs": tf.FixedLenFeature([], tf.string),
+                                                         "context_char_idxs": tf.FixedLenFeature([], tf.string),
+                                                         "ques_char_idxs": tf.FixedLenFeature([], tf.string),
+                                                         "y1": tf.FixedLenFeature([], tf.string),
+                                                         "y2": tf.FixedLenFeature([], tf.string),
+                                                         "id": tf.FixedLenFeature([], tf.int64)})
             context_char_idxs = tf.reshape(tf.decode_raw(features["context_char_idxs"], tf.int32), [para_limit, char_limit])
             ques_char_idxs = tf.reshape(tf.decode_raw(features["ques_char_idxs"], tf.int32), [ques_limit, char_limit])
-        else:
-            context_char_idxs = tf.reshape(tf.decode_raw(features["context_char_idxs"], tf.int32), [para_limit])
-            ques_char_idxs = tf.reshape(tf.decode_raw(features["ques_char_idxs"], tf.int32), [ques_limit])
+        else:  # 只处理词
+            features = tf.parse_single_example(example, 
+                                               features={"context_idxs": tf.FixedLenFeature([], tf.string),
+                                                         "ques_idxs": tf.FixedLenFeature([], tf.string),
+                                                         "y1": tf.FixedLenFeature([], tf.string),
+                                                         "y2": tf.FixedLenFeature([], tf.string),
+                                                         "id": tf.FixedLenFeature([], tf.int64)})
+        context_idxs = tf.reshape(tf.decode_raw(features["context_idxs"], tf.int32), [para_limit])
+        ques_idxs = tf.reshape(tf.decode_raw(features["ques_idxs"], tf.int32), [ques_limit])
         y1 = tf.reshape(tf.decode_raw(features["y1"], tf.float32), [para_limit])
         y2 = tf.reshape(tf.decode_raw(features["y2"], tf.float32), [para_limit])
         qa_id = features["id"]
-        return context_idxs, ques_idxs, context_char_idxs, ques_char_idxs, y1, y2, qa_id
+        if config.use_char_emb:  # 处理字的embedding，[[char, char, ...], [char, char, ...], ...]
+            return context_idxs, ques_idxs, context_char_idxs, ques_char_idxs, y1, y2, qa_id
+        else:
+            return context_idxs, ques_idxs, y1, y2, qa_id
     return parse
 
 
@@ -89,13 +98,27 @@ def convert_tokens(eval_file, qa_id, pp1, pp2):
 
 
 def normalize_answer(s):
-    pass  # 清晰文本s，optional
-    return s
+    # 清洗文本s，optional
+    
+    def remove_articles(text):
+        return re.sub(r'\b(a|an|the)\b', ' ', text)
+
+    def white_space_fix(text):
+        return ' '.join(text.split())
+
+    def remove_punc(text):
+        exclude = set(string.punctuation+'，。！？·、：；（）【】{}““\’')
+        return ''.join(ch for ch in text if ch not in exclude)
+
+    def lower(text):
+        return text.lower()
+
+    return white_space_fix(remove_articles(remove_punc(lower(s))))
 
 
 def f1_score(prediction, ground_truth):
-    prediction_tokens = normalize_answer(prediction).split()
-    ground_truth_tokens = normalize_answer(ground_truth).split()
+    prediction_tokens = jieba.lcut(normalize_answer(prediction))
+    ground_truth_tokens = jieba.lcut(normalize_answer(ground_truth))
     common = Counter(prediction_tokens) & Counter(ground_truth_tokens)
     num_same = sum(common.values())
     if num_same == 0:
@@ -107,7 +130,7 @@ def f1_score(prediction, ground_truth):
 
 
 def exact_match_score(prediction, ground_truth):
-    return normalize_answer(prediction == normalize_answer(ground_truth))
+    return (normalize_answer(prediction) == normalize_answer(ground_truth))
 
 
 def metric_max_over_ground_truths(metric_fn, prediction, ground_truths):
