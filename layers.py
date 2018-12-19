@@ -3,12 +3,10 @@
 import math
 import tensorflow as tf
 from tensorflow.python.ops import nn_ops
-import tensorflow.contrib.layers as tcl
 
-
-initializer = lambda: tcl.variance_scaling_initializer(factor=1.0, mode='FAN_AVG', uniform=True, dtype=tf.float32)
-initializer_relu = lambda: tcl.variance_scaling_initializer(factor=2.0, mode='FAN_IN', uniform=False, dtype=tf.float32)
-regularizer = tcl.l2_regularizer(scale=3e-7)
+initializer = lambda: tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode='FAN_AVG', uniform=True, dtype=tf.float32)
+initializer_relu = lambda: tf.contrib.layers.variance_scaling_initializer(factor=2.0, mode='FAN_IN', uniform=False, dtype=tf.float32)
+regularizer = tf.contrib.layers.l2_regularizer(scale=3e-7)
 
 
 def split_last_dimension(x, n):
@@ -318,7 +316,8 @@ def batch_dot(x, y, axes=None):
 def optimized_trilinear_for_attention(args, c_maxlen, q_maxlen, input_keep_prob=1.0, 
                                       scope='efficient_trilinear', 
                                       bias_initializer=tf.zeros_initializer(),
-                                      kernel_initializer=initializer()):
+                                      kernel_initializer=initializer(),
+                                      opt=False):
     assert len(args) == 2, "just use for computing attention with two input"
     arg0_shape = args[0].get_shape().as_list()
     arg1_shape = args[1].get_shape().as_list()
@@ -338,9 +337,9 @@ def optimized_trilinear_for_attention(args, c_maxlen, q_maxlen, input_keep_prob=
         subres1 = tf.tile(tf.transpose(dot(droped_args[1], weights4arg1), perm=(0, 2, 1)), [1, c_maxlen, 1])
         subres2 = batch_dot(droped_args[0] * weights4mlu, tf.transpose(droped_args[1], perm=(0, 2, 1)))
         res = subres0 + subres1 + subres2
-        # 加bias似乎无用
-        # biases = tf.get_variable("linear_bias", [1], dtype=dtype, regularizer=regularizer, initializer=bias_initializer)
-        # nn_ops.bias_add(res, biases)
+        if opt:
+            biases = tf.get_variable("linear_bias", [1], dtype=dtype, regularizer=regularizer, initializer=bias_initializer)
+            nn_ops.bias_add(res, biases)
         return res
 
 
