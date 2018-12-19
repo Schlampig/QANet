@@ -3,7 +3,7 @@
 import os
 import numpy as np
 from tqdm import tqdm
-import ujson as json
+import json as json
 import tensorflow as tf
 
 from model import Model
@@ -13,8 +13,11 @@ from util import get_record_parser, get_dataset, get_batch_dataset, convert_toke
 def train(config):
     with open(config.word_emb_file, "r") as fh:
         word_mat = np.array(json.load(fh), dtype=np.float32)
-    with open(config.char_emb_file, "r") as fh:
-        char_mat = np.array(json.load(fh), dtype=np.float32)
+    if config.use_char_emb:
+        with open(config.char_emb_file, "r") as fh:
+            char_mat = np.array(json.load(fh), dtype=np.float32)
+    else:
+        char_mat = None
     with open(config.train_eval_file, "r") as fh:
         train_eval_file = json.load(fh)
     with open(config.dev_eval_file, "r") as fh:
@@ -95,8 +98,11 @@ def train(config):
 def test(config):
     with open(config.word_emb_file, "r") as fh:
         word_mat = np.array(json.load(fh), dtype=np.float32)
-    with open(config.char_emb_file, "r") as fh:
-        char_mat = np.array(json.load(fh), dtype=np.float32)
+    if config.use_char_emb:
+        with open(config.char_emb_file, "r") as fh:
+            char_mat = np.array(json.load(fh), dtype=np.float32)
+    else:
+        char_mat = None
     with open(config.test_eval_file, "r") as fh:
         eval_file = json.load(fh)
     with open(config.test_meta, "r") as fh:
