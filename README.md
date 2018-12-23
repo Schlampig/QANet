@@ -35,6 +35,7 @@ This work is mainly coresponding to:
 * **Train and Evaluation**: train and evaluate data and save model and weights: cmd>>python config.py --train  <br>
 * **Test**: test data and print the f1 and exact matching results on screen: cmd>>python config.py --test  <br>
 * **Predict**: input question and context in predict.py and then cmd>>python predict.py  <br>
+<br>
 
 ## File's Relationship:
 ```
@@ -56,6 +57,7 @@ predict -> preprocess
   * jieba
   * tqdm
   * ujson(optional)
+<br>
 
 ## TODO
 - [x] Simplize the code in model.py, layer.py, utils.py, main.py 
