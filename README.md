@@ -30,12 +30,32 @@ This work is mainly coresponding to:
 ```
 <br>
 
+## Usage
+* **Prepare**: create tfrecords data (do cleansing, re-formating, embedding, etc) from sourced training, validation, and test datasets: cmd>> python config.py --prepare  <br>
+* **Train and Evaluation**: train and evaluate data and save model and weights: cmd>>python config.py --train  <br>
+* **Test**: test data and print the f1 and exact matching results on screen: cmd>>python config.py --test  <br>
+* **Predict**: input question and context in predict.py and then cmd>>python predict.py  <br>
+
+## File's Relationship:
+```
+config -> prepare -> embed
+
+     | -> main(train|test) -> model -> layers
+                         | -> util
+
+predict -> preprocess
+      | -> model -> layers
+      | -> config     
+```
+<br>
+
 ## Requirements
   * Python>=3.5
   * TensorFlow>=1.5
   * NumPy
+  * jieba
   * tqdm
-  * ujson
+  * ujson(optional)
 
 ## TODO
 - [x] Simplize the code in model.py, layer.py, utils.py, main.py 
