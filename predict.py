@@ -7,14 +7,14 @@ import json as json
 import numpy as np
 import tensorflow as tf
 # load model directory
-from config import Config
+from config import flags
 from model import Model
 from preprocess import preprocess
 
 
 # initialize graph and config
+config = flags.FLAGS
 graph = tf.Graph()
-config = Config()
 
 # load dictionary
 with open(config.word_dictionary, "r") as fh:
@@ -61,7 +61,7 @@ def predict(q, c):
     
 
 if __name__ == '__main__':
-    q = "佩鲁贾被什么队击败？"
+    q = "德拉瓦莱是谁？"
     c = """佛罗伦萨曾于五十至六十年代两夺意甲联赛冠军，之后长期处于联赛中下游，并多次降班。2002年因财赤宣布破产，被意大利赛会判罚降班。之后得到鞋业商人德拉瓦莱（Diego Della Valle）的支持组成新球队 Florentia Viola，并于意大利丙二组联赛开始比赛。2003年夏天，德拉瓦莱买回“Fiorentina”这个名称，并再次以佛罗伦萨的名称参加比赛。2004年在升级附加赛中击败佩鲁贾，完成了令人惊艳的三级跳，顺利重返意甲联赛。"""
     print(predict(q, c))
     
