@@ -20,9 +20,10 @@ This work is mainly coresponding to:
                  'segmented_context': list, 
                  'qas': [{'question': string, 
                           'segmented_question': list, 
-                          'answers': [{'text': string, 
-                                       'answer_span': [int_start, int_end]}], 
-                                       'id': int_index}]}]}
+                          'answers': [{'text': string, 'answer_span': [int_start, int_end]}], 
+                          'id': int_index}]
+                 }]  # paragraph now
+}  # sample now
 ```
 * **example**: an example sample is given as follows:
 ```
