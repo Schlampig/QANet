@@ -111,7 +111,7 @@ def text2index(example_now, w2i_dict, limit):
     return idx
 
 
-def build_features(config, examples, out_file, word2idx_dict, char2idx_dict, is_test=False):
+def build_features(config, examples, out_file, word2idx_dict, char2idx_dict=None, is_test=False):
     # 根据example中的词向量，最终生成用于模型训练的数据并存储
     # input: word2idx_dict，词典
     #        char2idx_dict, 字典（当config.use_char_emb=False时是另一个词典)
@@ -132,12 +132,10 @@ def build_features(config, examples, out_file, word2idx_dict, char2idx_dict, is_
     writer = tf.python_io.TFRecordWriter(out_file)
     total = 0
     meta = {}
-    n = 0
     for example in tqdm(examples):
-        total += 1
         if filter_func(example):
             continue
-            
+        total += 1
         # 生成上下文与问题的词index矩阵
         context_idxs = text2index(example["context_tokens"], word2idx_dict, limit=[para_limit])
         ques_idxs = text2index(example["ques_tokens"], word2idx_dict, limit=[ques_limit])
@@ -150,6 +148,8 @@ def build_features(config, examples, out_file, word2idx_dict, char2idx_dict, is_
         
         # 生成上下文与问题的字index矩阵
         if config.use_char_emb:  # 提取字信息
+            if char2idx_dict is None:
+                raise ValueError("using char2idx_dict but it is None.")
             context_char_idxs = text2index(example["context_chars"], char2idx_dict, limit=[para_limit, char_limit])
             ques_char_idxs = text2index(example["ques_chars"], char2idx_dict, limit=[ques_limit, char_limit])
             feature={"context_idxs": tf.train.Feature(bytes_list=tf.train.BytesList(value=[context_idxs.tostring()])),
@@ -193,15 +193,16 @@ def prepare(config):
     train_examples, train_eval = process_file(config.train_file, word_counter, char_counter)
     dev_examples, dev_eval = process_file(config.dev_file, word_counter, char_counter)
     test_examples, test_eval = process_file(config.test_file, word_counter, char_counter)
+    
     # 生成词典与字典，此处要自定义使用哪个embedding策略，这些策略都存放在embed.py中
     print('Get word_emb_mat, word2idx_dict, char_emb_mat, char2idx_dict...')
     word_emb_mat, word2idx_dict = simple_embedding(word_counter, emb_file=config.pretrain_word_emb_file, limit=-1, vec_size=config.vec_size)
-    char_emb_mat, char2idx_dict = simple_embedding(char_counter, emb_file=None, limit=-1, vec_size=config.char_dim)
+#     char_emb_mat, char2idx_dict = simple_embedding(char_counter, emb_file=None, limit=-1, vec_size=config.char_dim)
     # 生成最终格式data并存储
     print('Create and record train, dev, test data...')
-    _ = build_features(config, train_examples, config.train_record_file, word2idx_dict, char2idx_dict)
-    dev_meta = build_features(config, dev_examples, config.dev_record_file, word2idx_dict, char2idx_dict)
-    test_meta = build_features(config, test_examples, config.test_record_file, word2idx_dict, char2idx_dict, is_test=True)
+    _ = build_features(config, train_examples, config.train_record_file, word2idx_dict)
+    dev_meta = build_features(config, dev_examples, config.dev_record_file, word2idx_dict)
+    test_meta = build_features(config, test_examples, config.test_record_file, word2idx_dict, is_test=True)
     # 存储数据
     save_json(config.train_eval_file, train_eval)
     save_json(config.dev_eval_file, dev_eval)
