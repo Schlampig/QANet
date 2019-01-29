@@ -22,6 +22,7 @@ new_sample = {'title': '',
 
 
 import json
+import random
 import pandas as pd
 from random import choice
 from tqdm import tqdm
@@ -106,8 +107,11 @@ def get_sample(json_now, dict_q):
         return None
     seg_c = jieba.lcut(c)
     i_b, i_e = match_answer(seg_c, ans)
-    if i_b is None or i_e is None or i_b < len(seg_c)*0.25:
+    if i_b is None or i_e is None:
         return None
+    if i_b < len(seg_c)*0.25:
+        if random.uniform(0, 1) < 0.9:  # constrain the number of examples, in which answers appear in the first 1/4 places
+            return None
     q = choice(dict_q[json_now["relation"]])  # randomly choose a question
     seg_q = jieba.lcut(q)
     entity = json_now["triples"].strip("\n").split("\t")[0]  # build normal question, replace XXX with the entity mention
@@ -181,6 +185,6 @@ def gen_data(lst, dict_q, n=100, ratio=-1.0):
 if __name__ == '__main__':
     d_q = gen_question(load_path="questions_for_200_relation.xlsx")
     l_train, l_test = split_train_and_test()
-    gen_data(l_train, d_q, n=3000, ratio=0.8)
-    gen_data(l_test, d_q, n=300)
+    gen_data(l_train, d_q, n=10000, ratio=0.8)
+    gen_data(l_test, d_q, n=500)
     print("finished")
