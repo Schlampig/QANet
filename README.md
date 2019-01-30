@@ -40,7 +40,7 @@ This work is mainly coresponding to:
 
 ## File's Relationship:
 ```
-config -> prepare -> embed
+config -> prepro
 
      | -> main(train|test) -> model -> layers
                          | -> util
