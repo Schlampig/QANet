@@ -5,21 +5,24 @@ import tensorflow as tf
 from prepro import prepro
 from main import train, test
 
-flags = tf.flags
 
 # Configuration
 #############################################################################################
+# Set GPU
+# ----------------------------------------------------------------------------------------- #
+os.environ["CUDA_VISIBLE_DEVICES"] = "0, 1, 2, 3, 4"
+
 # Set path
 # ----------------------------------------------------------------------------------------- #
 home = os.path.expanduser(".")
-train_file = "../datasets/data_0128/train.json"
-dev_file = "../datasets/data_0128/dev.json"
-test_file = "../datasets/data_0128/test.json"
+train_file = "../datasets/data_DRCD_new_0129/new_DRCD_train_large.json"
+dev_file = "../datasets/data_DRCD_new_0129/new_DRCD_dev.json"
+test_file = "../datasets/data_DRCD_new_0129/new_DRCD_dev.json"
 glove_word_file = "../tools/Tencent_AILab_ChineseEmbedding.txt"
-
 target_dir = "data"  # 存放prepro生成的文件
 train_dir = "train"  # 存放训练生成的数据，包括history, records等
 model_name = "FRC"  # 模型名称
+
 dir_name = os.path.join(train_dir, model_name)
 log_dir = os.path.join(dir_name, "event")
 save_dir = os.path.join(dir_name, "model")
@@ -52,6 +55,7 @@ if not os.path.exists(answer_dir):
 
 # Set flags
 # ----------------------------------------------------------------------------------------- #
+flags = tf.flags
 # settings for directories
 flags.DEFINE_string("mode", "train", "Running mode prepro/train/test")
 flags.DEFINE_string("target_dir", target_dir, "Target directory for out data")
@@ -114,30 +118,18 @@ flags.DEFINE_string("fasttext_file", fasttext_file, "Fasttext word embedding sou
 flags.DEFINE_boolean("fasttext", False, "Whether to use fasttext")
 
 
-# Set GPU
-# ----------------------------------------------------------------------------------------- #
-def set_gpu(gpu_ratio, gpu_id):
-    assert isinstance(gpu_ratio, float) and isinstance(gpu_id, str)
-    os.environ["CUDA_VISIBLE_DEVICES"] = gpu_id
-    cfg = tf.ConfigProto()
-    cfg.gpu_options.per_process_gpu_memory_fraction = gpu_ratio
-    session = tf.Session(config=cfg)
-    return None
-
-
 # Run
 #############################################################################################
+# Set path
+# ----------------------------------------------------------------------------------------- #
 def main(_):
     config = flags.FLAGS
-#     set_gpu(gpu_ratio=1.0, gpu_id="1")
     if config.mode == "train":
         train(config)
     elif config.mode == "prepro":
         prepro(config)
     elif config.mode == "test":
         test(config)
-    elif config.mode == "demo":
-        demo(config)
     else:
         print("Unknown mode")
         exit(0)
