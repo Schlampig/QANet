@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import re
 import string
 from collections import Counter
@@ -9,14 +11,11 @@ def get_record_parser(config, is_test=False):
     def parse(example):
         para_limit = config.test_para_limit if is_test else config.para_limit
         ques_limit = config.test_ques_limit if is_test else config.ques_limit
-        features = tf.parse_single_example(example,
-                                           features={
-                                               "context_idxs": tf.FixedLenFeature([], tf.string),
-                                               "ques_idxs": tf.FixedLenFeature([], tf.string),
-                                               "y1": tf.FixedLenFeature([], tf.string),
-                                               "y2": tf.FixedLenFeature([], tf.string),
-                                               "id": tf.FixedLenFeature([], tf.int64)
-                                           })
+        features = tf.parse_single_example(example, features={"context_idxs": tf.FixedLenFeature([], tf.string),
+                                                              "ques_idxs": tf.FixedLenFeature([], tf.string),
+                                                              "y1": tf.FixedLenFeature([], tf.string),
+                                                              "y2": tf.FixedLenFeature([], tf.string),
+                                                              "id": tf.FixedLenFeature([], tf.int64)})
         context_idxs = tf.reshape(tf.decode_raw(features["context_idxs"], tf.int32), [para_limit])
         ques_idxs = tf.reshape(tf.decode_raw(features["ques_idxs"], tf.int32), [ques_limit])
         y1 = tf.reshape(tf.decode_raw(features["y1"], tf.float32), [para_limit])
@@ -32,13 +31,12 @@ def get_batch_dataset(record_file, parser, config):
     if config.is_bucket:
         buckets = [tf.constant(num) for num in range(*config.bucket_range)]
 
-        def key_func(context_idxs, ques_idxs, y1, y2, qa_id):
-            c_len = tf.reduce_sum(
-                tf.cast(tf.cast(context_idxs, tf.bool), tf.int32))
+        def key_func(context_idxs):
+            c_len = tf.reduce_sum(tf.cast(tf.cast(context_idxs, tf.bool), tf.int32))
             t = tf.clip_by_value(buckets, 0, c_len)
             return tf.argmax(t)
 
-        def reduce_func(key, elements):
+        def reduce_func(elements):
             return elements.batch(config.batch_size)
 
         dataset = dataset.apply(tf.contrib.data.group_by_window(key_func, reduce_func, window_size=5 * config.batch_size)).shuffle(len(buckets) * 25)
@@ -73,17 +71,6 @@ def evaluate(eval_file, answer_dict):
         total += 1
         ground_truths = eval_file[key]["answers"]
         prediction = value
-        
-        print("context:")
-        print(eval_file[key]["context"])
-        print("question:")
-        print(eval_file[key].keys())
-        print("true:")
-        print(ground_truths)
-        print("predict:")
-        print(prediction)
-        print("*"*30)
-        
         exact_match += metric_max_over_ground_truths(exact_match_score, prediction, ground_truths)
         f1 += metric_max_over_ground_truths(f1_score, prediction, ground_truths)
     exact_match = 100.0 * exact_match / total
