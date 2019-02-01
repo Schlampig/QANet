@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import os
 import numpy as np
 import json as json
@@ -17,8 +19,8 @@ def train(config):
         dev_eval_file = json.load(fh)
     with open(config.dev_meta, "r") as fh:
         meta = json.load(fh)
-
     dev_total = meta["total"]
+
     print("Building model...")
     parser = get_record_parser(config)
     graph = tf.Graph()
@@ -31,7 +33,6 @@ def train(config):
         dev_iterator = dev_dataset.make_one_shot_iterator()
 
         model = Model(config, iterator, word_mat, graph=g)
-
         sess_config = tf.ConfigProto(allow_soft_placement=True)
         sess_config.gpu_options.allow_growth = True
 
@@ -107,15 +108,15 @@ def test(config):
         meta = json.load(fh)
     total = meta["total"]
 
-    graph = tf.Graph()
     print("Loading model...")
+    graph = tf.Graph()
     with graph.as_default() as g:
         test_batch = get_dataset(config.test_record_file, get_record_parser(config, is_test=True), config).make_one_shot_iterator()
 
         model = Model(config, test_batch, word_mat, trainable=False, graph=g)
-
         sess_config = tf.ConfigProto(allow_soft_placement=True)
         sess_config.gpu_options.allow_growth = True
+
         with tf.Session(config=sess_config) as sess:
             sess.run(tf.global_variables_initializer())
             saver = tf.train.Saver()
@@ -131,7 +132,6 @@ def test(config):
                 answer_dict.update(answer_dict_)
                 remapped_dict.update(remapped_dict_)
                 losses.append(loss)
-            loss = np.mean(losses)
             metrics = evaluate(eval_file, answer_dict)
             with open(config.answer_file, "w") as fh:
                 json.dump(remapped_dict, fh, ensure_ascii=False)
