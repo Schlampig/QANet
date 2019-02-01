@@ -11,8 +11,7 @@ import jieba
 
 
 def word_tokenize(sent):
-    doc = jieba.lcut(sent)
-    return [token for token in doc]
+    return jieba.lcut(sent)
 
 
 def convert_idx(text, tokens):
@@ -45,7 +44,6 @@ def process_file(filename, data_type, word_counter):
                     word_counter[token] += len(para["qas"])
                 for qa in para["qas"]:
                     total += 1
-                    ques = qa["question"]
                     ques_tokens = qa["segmented_question"]
                     for token in ques_tokens:
                         word_counter[token] += 1
@@ -101,49 +99,6 @@ def get_embedding(counter, data_type, limit=-1, emb_file=None, size=None, vec_si
     return emb_mat, token2idx_dict
 
 
-# def convert_to_features(config, data, word2idx_dict):
-#     example = {}
-#     context, question = data
-#     context = context.replace("''", '" ').replace("``", '" ')
-#     question = question.replace("''", '" ').replace("``", '" ')
-#     example['context_tokens'] = word_tokenize(context)
-#     example['ques_tokens'] = word_tokenize(question)
-
-#     para_limit = config.test_para_limit
-#     ques_limit = config.test_ques_limit
-#     ans_limit = 100
-
-#     def filter_func(example):
-#         return len(example["context_tokens"]) > para_limit or len(example["ques_tokens"]) > ques_limit
-
-#     if filter_func(example):
-#         raise ValueError("Context/Questions lengths are over the limit")
-
-#     context_idxs = np.zeros([para_limit], dtype=np.int32)
-#     ques_idxs = np.zeros([ques_limit], dtype=np.int32)
-#     y1 = np.zeros([para_limit], dtype=np.float32)
-#     y2 = np.zeros([para_limit], dtype=np.float32)
-
-#     def _get_word(word):
-#         for each in (word, word.lower(), word.capitalize(), word.upper()):
-#             if each in word2idx_dict:
-#                 return word2idx_dict[each]
-#         return 1
-
-#     def _get_char(char):
-#         if char in char2idx_dict:
-#             return char2idx_dict[char]
-#         return 1
-
-#     for i, token in enumerate(example["context_tokens"]):
-#         context_idxs[i] = _get_word(token)
-
-#     for i, token in enumerate(example["ques_tokens"]):
-#         ques_idxs[i] = _get_word(token)
-
-#     return context_idxs, ques_idxs
-
-
 def build_features(config, examples, data_type, out_file, word2idx_dict, is_test=False):
     para_limit = config.test_para_limit if is_test else config.para_limit
     ques_limit = config.test_ques_limit if is_test else config.ques_limit
@@ -152,9 +107,9 @@ def build_features(config, examples, data_type, out_file, word2idx_dict, is_test
     def filter_func(example, is_test=False):
         if len(example["y2s"]) == 0 or len(example["y1s"]) == 0:
             return True
-        if example["y2s"][0] == None:
+        if example["y2s"][0] is None:
             example["y2s"][0] = 0
-        if example["y1s"][0] == None:
+        if example["y1s"][0] is None:
             example["y1s"][0] = 0
         return len(example["context_tokens"]) > para_limit or \
                len(example["ques_tokens"]) > ques_limit or \
@@ -167,10 +122,8 @@ def build_features(config, examples, data_type, out_file, word2idx_dict, is_test
     meta = {}
     for example in tqdm(examples):
         total_ += 1
-
         if filter_func(example, is_test):
             continue
-
         total += 1
         context_idxs = np.zeros([para_limit], dtype=np.int32)
         ques_idxs = np.zeros([ques_limit], dtype=np.int32)
