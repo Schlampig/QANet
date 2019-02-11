@@ -61,9 +61,11 @@ predict -> preprocess
 <br>
 
 ## TODO
-- [x] Simplize the code in model.py, layer.py, utils.py, main.py 
-- [x] Add prepare.py for training and testing DuReader-based Dataset 
-- [x] Train and test a weak baseline
-- [x] Write predict.py and preprocess.py (for operate predicted questions and contexts)
-- [ ] Train and test a strong baseline
-- [ ] Run a demo on a special domain
+- [x] Simplize the code in model.py, layer.py, utils.py, main.py.
+- [x] Add prepare.py for training and testing DuReader-based Dataset.
+- [x] Train and test a weak baseline.
+- [x] Write predict.py and preprocess.py (for operate predicted questions and contexts).
+- [x] Modify the code for efficiency.
+- [x] Build dataset for the model.
+- [ ] Train and test a new baseline.
+- [ ] Try to improve the performance.
