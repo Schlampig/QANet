@@ -167,7 +167,7 @@ def gen_data(lst, dict_q, n=100, ratio=-1.0):
 
 
 if __name__ == '__main__':
-    d_q = gen_question(load_path="questions_for_200_relation.xlsx")
+    d_q = gen_question(load_path="questions_for_relation.xlsx")
     l_train, l_test = split_train_and_test()
     gen_data(l_train, d_q, n=10000, ratio=0.8)
     gen_data(l_test, d_q, n=500)
