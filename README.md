@@ -15,15 +15,19 @@ This work is mainly coresponding to:
 * **source**: The dataset used for this work is mainly from [DuReader Dataset](http://ai.baidu.com/broad/subordinate?dataset=dureader). <br>
 * **format**: Training, validation, and test data are stored in three large json files, with the structure like this: json = {'data': lst_data} where lst_data = \[sample_1, sample_2, ..., sample_N\]. In detail, sample_i is expanded as follows: <br>
 ```
-{'title': '', 
- 'paragraphs': [{'context': string, 
-                 'segmented_context': list, 
-                 'qas': [{'question': string, 
-                          'segmented_question': list, 
-                          'answers': [{'text': string, 'answer_span': [int_start, int_end]}], 
-                          'id': int_index}]
-                 }]  # paragraph now
-}  # sample now
+j = {"data": lst}
+
+lst = [article_1, article_2, article_3, ...]
+
+article_i = {'title': '', 
+             'paragraphs': [{'context': string, 
+                             'segmented_context': list, 
+                             'qas': [{'question': string, 
+                                      'segmented_question': list, 
+                                      'answers': [{'text': string, 'answer_span': [int_start, int_end]}], 
+                             'id': int_index}]
+                            }]  # paragraph now
+             }  # sample now
 ```
 * **example**: an example sample is given as follows:
 ```
@@ -38,7 +42,7 @@ This work is mainly coresponding to:
 * **Predict**: input question and context in predict.py and then cmd>>python predict.py  <br>
 <br>
 
-## File's Relationship:
+## Codes Dependency:
 ```
 config -> prepro
 
@@ -47,7 +51,35 @@ config -> prepro
 
 predict -> preprocess
       | -> model -> layers
-      | -> config     
+      | -> config    
+
+server -> preprocess
+      | -> model -> layers
+      | -> config 
+      
+```
+<br>
+
+## Command Line:
+* **preprocess**: preprocess the used datasets, get word embeddings and word dictionaries.
+```bash
+python config.py --mode prepro
+```
+* **train**: train, evaluate, and store the model.
+```bash
+python config.py --mode train
+```
+* **test**: test the model.
+```bash
+python config.py --mode test
+```
+* **predict**: predict single example defined in predict.py.
+```bash
+python predict.py
+```
+* **open server**: run the flask server, and do the example via Postman.
+```bash
+python server.py
 ```
 <br>
 
@@ -58,6 +90,7 @@ predict -> preprocess
   * jieba
   * tqdm
   * ujson(optional)
+  * Flask(optional, if runing the server.py)
 <br>
 
 ## TODO
@@ -67,5 +100,5 @@ predict -> preprocess
 - [x] Write predict.py and preprocess.py (for operate predicted questions and contexts).
 - [x] Modify the code for efficiency.
 - [x] Build dataset for the model.
-- [ ] Train and test a new baseline.
+- [x] Train and test a new baseline.
 - [ ] Try to improve the performance.
