@@ -35,7 +35,7 @@ with graph.as_default() as g:
                                        feed_dict={model.c:default_c, model.q:default_q})
 
 
-def search_tagging(para, query):
+def readingComprehension(para, query):
     c, seg_c = preprocess(para, config, word_dict)
     q, _ = preprocess(query, config, word_dict)
     qa_id, logits, yp1, yp2 = sess.run([model.qa_id, model.logits, model.yp1, model.yp2], 
@@ -51,4 +51,4 @@ if __name__ == '__main__':
 
     print("context: ", c)
     print("question: ", q)
-    print("prediction: ", search_tagging(c, q))
+    print("prediction: ", readingComprehension(c, q))
