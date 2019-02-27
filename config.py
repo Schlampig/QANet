@@ -15,10 +15,10 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0, 1, 2, 3, 4"
 # Set path
 # ----------------------------------------------------------------------------------------- #
 home = os.path.expanduser(".")
-train_file = "../datasets/data_DRCD_new_0129/new_DRCD_train_large.json"
-dev_file = "../datasets/data_DRCD_new_0129/new_DRCD_dev.json"
-test_file = "../datasets/data_DRCD_new_0129/new_DRCD_dev.json"
-glove_word_file = "../tools/Tencent_AILab_ChineseEmbedding.txt"
+train_file = "toy_train.json"
+dev_file = "toy_dev.json"
+test_file = "toy_test.json"
+glove_word_file = "Tencent_AILab_ChineseEmbedding.txt"
 target_dir = "data"  # 存放prepro生成的文件
 train_dir = "train"  # 存放训练生成的数据，包括history, records等
 model_name = "FRC"  # 模型名称
