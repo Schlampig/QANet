@@ -83,10 +83,11 @@ python server.py
 ## Requirements
   * Python>=3.5
   * TensorFlow>=1.5
-  * NumPy
+  * numpy
   * jieba
   * tqdm
   * ujson(optional)
+  * pandas(optional, if creating dataset)
   * Flask(optional, if runing the server.py)
 <br>
 
