@@ -51,7 +51,7 @@ def readingComprehension(para, query):
     return answer
 
 
-@app.route("/gammalab14service", methods=["POST"])
+@app.route("/", methods=["POST"])
 def hello():
     json_str = request.json
     context, question = json_str.get("context"), json_str.get("question")
