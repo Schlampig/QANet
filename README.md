@@ -1,4 +1,4 @@
-# QANet
+# QANet for Chinese
 
 ## Source:
 This work is mainly coresponding to:
