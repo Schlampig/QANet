@@ -15,19 +15,16 @@ This work is mainly coresponding to:
 * **source**: The dataset used for this work is mainly from [DuReader Dataset](http://ai.baidu.com/broad/subordinate?dataset=dureader). <br>
 * **format**: Training, validation, and test data are stored in three large json files, with the structure like this: json = {'data': lst_data} where lst_data = \[sample_1, sample_2, ..., sample_N\]. In detail, sample_i is expanded as follows: <br>
 ```
-j = {"data": lst}
 
-lst = [article_1, article_2, article_3, ...]
-
-article_i = {'title': '', 
-             'paragraphs': [{'context': string, 
-                             'segmented_context': list, 
-                             'qas': [{'question': string, 
-                                      'segmented_question': list, 
-                                      'answers': [{'text': string, 'answer_span': [int_start, int_end]}], 
-                             'id': int_index}]
-                            }]  # paragraph now
-             }  # sample now
+sample_i = {'title': '', 
+            'paragraphs': [{'context': string, 
+                            'segmented_context': list, 
+                            'qas': [{'question': string, 
+                                     'segmented_question': list, 
+                                     'answers': [{'text': string, 'answer_span': [int_start, int_end]}], 
+                            'id': int_index}]
+                           }]  # paragraph now
+            }  # sample now
 ```
 * **example**: an example sample is given as follows:
 ```
