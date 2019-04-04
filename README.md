@@ -32,13 +32,6 @@ sample_i = {'title': '',
 ```
 <br>
 
-## Usage
-* **Prepare**: create tfrecords data (do cleansing, re-formating, embedding, etc) from sourced training, validation, and test datasets: cmd>> python config.py --prepare  <br>
-* **Train and Evaluation**: train and evaluate data and save model and weights: cmd>>python config.py --train  <br>
-* **Test**: test data and print the f1 and exact matching results on screen: cmd>>python config.py --test  <br>
-* **Predict**: input question and context in predict.py and then cmd>>python predict.py  <br>
-<br>
-
 ## Codes Dependency:
 ```
 config -> prepro
