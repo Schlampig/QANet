@@ -110,3 +110,7 @@ print(response.text)
 - [x] Build dataset for the model.
 - [x] Train and test a new baseline.
 - [ ] Try to improve the performance.
+
+<br>
+
+![AI日读（Daily AI Paper View）](https://github.com/Schlampig/Knowledge_Graph_Wander/blob/master/content/daily_ai_paper_view.png)
